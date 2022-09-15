@@ -1,0 +1,57 @@
+{{- if .Values.monitoring.prometheus.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cw-prometheus-metrics
+  namespace: amazon-cloudwatch
+  labels:
+    component: metric-collector
+    part-of: logging-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cw-prometheus-metrics
+      component: metric-collector
+      part-of: logging-monitoring
+  template:
+    metadata:
+      labels:
+        app: cw-prometheus-metrics
+        component: metric-collector
+        part-of: logging-monitoring
+        revision: {{ .Release.Revision | quote }}
+    spec:
+      containers:
+        - name: cw-prometheus-metrics
+          image: {{ .Values.cwprom.image.repository }}:{{ .Values.cwprom.image.tag }}
+          imagePullPolicy: {{ .Values.cwprom.image.pullPolicy | default "Always"}}
+          resources:
+            limits:
+              cpu:  1000m
+              memory: 1000Mi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          # Please don't change below envs
+          env:
+            - name: CI_VERSION
+              value: "k8s/1.3.5"
+          # Please don't change the mountPath
+          volumeMounts:
+            - name: prometheus-cwagentconfig
+              mountPath: /etc/cwagentconfig
+            - name: prometheus-config
+              mountPath: /etc/prometheusconfig
+
+      volumes:
+        - name: prometheus-cwagentconfig
+          configMap:
+            name: prometheus-cwagentconfig
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+      terminationGracePeriodSeconds: 60
+      serviceAccountName: monitoring-sa
+{{- end -}}

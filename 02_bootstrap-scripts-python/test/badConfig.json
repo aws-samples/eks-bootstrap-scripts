@@ -1,0 +1,7 @@
+{
+  "someinvalidstuff": [
+    {
+      "foo": "bar"
+    }
+  ]
+}

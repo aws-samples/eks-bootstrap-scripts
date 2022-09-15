@@ -1,0 +1,10 @@
+# Match any file or path named .git
+.git
+
+# Match any text file
+*.txt
+
+#Do no include buildspec
+buildspec.yaml
+
+

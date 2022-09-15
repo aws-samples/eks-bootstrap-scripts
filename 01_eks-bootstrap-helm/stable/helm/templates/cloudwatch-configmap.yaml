@@ -1,0 +1,26 @@
+{{- if .Values.monitoring.enabled -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "logging-monitoring.fullname" . }}
+  namespace: amazon-cloudwatch
+  labels:
+    {{- include "logging-monitoring.labels" . | nindent 4 }}
+    name: cloudwatch-config-map
+    component: metric-collector
+    part-of: logging-monitoring
+data:
+  cwagentconfig.json: |
+    {
+      "logs": {
+        "metrics_collected": {
+          "kubernetes": {
+            "cluster_name": "{{ .Values.global.clusterName }}",
+            "metrics_collection_interval": 60
+          }
+        },
+        "force_flush_interval": 5
+      }
+    }
+{{- end -}}

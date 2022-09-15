@@ -1,0 +1,16 @@
+{{- if and .Values.monitoring.serviceAccount.create .Values.monitoring.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cwagent-namesapced-role
+  namespace: amazon-cloudwatch
+  labels:
+    name: cloudwatch-cluster-role
+    component: metric-collector
+    part-of: logging-monitoring
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["cwagent-clusterleader"]
+  verbs: ["get","update"]
+{{- end -}}

@@ -1,0 +1,66 @@
+{
+  "efscsi": {
+    "enabled": true
+  },
+  "ebscsi": {
+    "enabled": true
+  },
+  "efs":
+    [
+    {
+        "name": "myVolume1",
+        "lifecyclePolicy": "AFTER_14_DAYS",
+        "performanceMode": "GENERAL_PURPOSE",
+        "throughputMode": "BURSTING",
+        "provisionedThroughputPerSecond": 100,
+        "removalPolicy": "DESTROY",
+        "storageClasses": [
+            {
+                "name": "myefs",
+                "retain": "Delete"
+            }
+        ],
+       "encrypted": true,
+       "subnetIds": [
+        "subnet-022b74875707ce914 ",
+        "subnet-04c0aaed3cf4e4f9b",
+        "subnet-03e6022688753e94a"
+      ]
+    }
+    ],
+    "createCustomNetworking": {
+        "enabled": true,
+        "cniSubnets": {
+            "us-west-2a": "subnet-0dcb393e627422d39",
+            "us-west-2b": "subnet-0663e2c475c7d9c01",
+            "us-west-2c": "subnet-0fd32845773945734"
+        }
+    },
+    "loadbalancercontroller": {
+    "enabled": true
+    },
+    "externaldns": {
+        "enabled": true,
+        "hostedZoneDomain": "HOSTED_ZONE_DOMAIN_NAME",
+        "hostedZoneId": "HOSTED_ZONE_ID"
+    },
+    "ebs": [
+        {
+          "apiVersion": "storage.k8s.io/v1",
+          "kind": "StorageClass",
+          "metadata": {
+            "name": "myebs"
+          },
+          "provisioner": "kubernetes.io/aws-ebs",
+          "parameters": {
+            "type": "gp2"
+          },
+          "reclaimPolicy": "Delete",
+          "allowVolumeExpansion": true,
+          "mountOptions": [
+            "debug"
+          ],
+          "volumeBindingMode": "WaitForFirstConsumer"
+        }
+      ]
+}

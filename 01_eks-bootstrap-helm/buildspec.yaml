@@ -1,0 +1,38 @@
+version: 0.2
+env:
+  variables:
+    HELM_EXPERIMENTAL_OCI: '1'
+    MAINLINE_BRANCH_NAME: master
+phases:
+  install:
+    runtime-versions:
+      python: 3.x
+    commands:
+      - curl https://baltocdn.com/helm/signing.asc | apt-key add -
+      - apt-get update && apt-get install apt-transport-https --yes
+      - echo "deb https://baltocdn.com/helm/stable/debian/ all main" | tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+  pre_build:
+    commands:
+      - apt-get update
+      - apt-get install --yes helm
+      - aws ecr get-login-password | helm registry login --username AWS --password-stdin --password-stdin $(aws sts get-caller-identity --output text --query 'Account').dkr.ecr.us-west-2.amazonaws.com
+      - pip3 install yq
+
+  build:
+    commands:
+      - export CHARTVERSION=$(yq e '.version' stable/helm/Chart.yaml)
+      - export NOW=$(echo $CHARTVERSION + .1 | bc)
+      - helm chart save stable/helm/ $(aws sts get-caller-identity --output text --query 'Account').dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$NOW
+      - helm chart push $(aws sts get-caller-identity --output text --query 'Account').dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$NOW
+
+
+aws codeartifact login --tool pip --repository bootstrap-scripts-python --domain eks-bootstrap --domain-owner $(aws sts get-caller-identity --output text --query 'Account') --region us-west-2
+pip install bootstrap-cli
+export HELM_EXPERIMENTAL_OCI=1
+export BOOTSTRAP_DEFAULT_REPO=$(aws sts get-caller-identity --output text --query 'Account').dkr.ecr.us-west-2.amazonaws.com
+export BOOTSTRAP_HELM_DEFAULT_IMAGE=helm-eks-bootstrap
+export HELM_IMAGE_TAG=1.0
+export HELMD_awslbc__clusterName=sample-cluster
+export HELMD_global__clusterName=sample-cluster
+aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $(aws sts get-caller-identity --output text --query 'Account').dkr.ecr.us-west-2.amazonaws.com

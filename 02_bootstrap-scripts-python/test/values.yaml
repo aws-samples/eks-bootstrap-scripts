@@ -1,0 +1,74 @@
+global:
+  clusterName: cluster_name
+  region: us-east-1
+
+awslbc:
+  enabled: False
+
+efs:
+  volumes:
+    - id: fs-12345678
+      name: volume1
+      storageClasses:
+        - name: stgClass1
+
+fluentbit:
+  output:
+    kinesis: {}
+    s3: {}
+  image:
+    repository: amazon/aws-for-fluent-bit
+    pullPolicy: Always
+    tag: latest
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+
+  serviceAccount:
+    create: true
+
+  hostNetwork: false
+
+cwprom:
+  image:
+    repository: amazon/cloudwatch-agent
+    tag: 1.247345.36b249270
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+
+  serviceAccount:
+    create: true
+
+  hostNetwork: false
+
+cwinsights:
+  image:
+    repository: amazon/cloudwatch-agent
+    tag: 1.247345.36b249270
+    pullPolicy: IfNotPresent
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+
+  serviceAccount:
+    create: true
+    name: cwagent-insights
+
+  hostNetwork: false

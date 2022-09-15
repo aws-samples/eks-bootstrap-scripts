@@ -1,0 +1,10 @@
+{
+    "MonitoringRole": "arn:aws:iam::${ACCOUNT_ID}:role/MonitoringRole",
+    "ExternalDnsControllerRole": "arn:aws:iam::${ACCOUNT_ID}:role/ExternalDnsControllerRole",
+    "EfsCsiDriverRole": "arn:aws:iam::${ACCOUNT_ID}:role/EfsCsiDriverRole",
+    "EksSecurityGroup": "${CLUSTER_SG_ID}",
+    "AlbControllerRole": "arn:aws:iam::${ACCOUNT_ID}:role/AlbControllerRole",
+    "EksClusterName": "${CLUSTER_NAME}",
+    "EbsCsiDriverRole": "arn:aws:iam::${ACCOUNT_ID}:role/EbsCsiDriverRole",
+    "myVolume1" : "${EFS_ID}"
+}

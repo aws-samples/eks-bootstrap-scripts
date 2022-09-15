@@ -1,0 +1,87 @@
+{{- if .Values.monitoring.enabled -}}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-cloudwatch-metrics
+  namespace: amazon-cloudwatch
+  labels:
+    component: metric-collector
+    part-of: logging-monitoring
+spec:
+  selector:
+    matchLabels:
+      app: cloudwatch-daemonset
+      component: metric-collector
+      part-of: logging-monitoring
+  template:
+    metadata:
+      labels:
+        app: cloudwatch-daemonset
+        component: metric-collector
+        part-of: logging-monitoring
+        revision: {{ .Release.Revision | quote }}
+    spec:
+      serviceAccountName: monitoring-sa
+      hostNetwork: {{ .Values.cwinsights.hostNetwork }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: {{ .Values.cwinsights.image.repository }}:{{ .Values.cwinsights.image.tag }}
+        imagePullPolicy: {{ .Values.cwinsights.image.pullPolicy | default "Always" }}
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: HOST_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CI_VERSION
+          value: "k8s/1.2.2"
+        # Please don't change the mountPath
+        volumeMounts:
+        - name: cwagentconfig
+          mountPath: /etc/cwagentconfig
+        - name: rootfs
+          mountPath: /rootfs
+          readOnly: true
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+          readOnly: true
+        - name: varlibdocker
+          mountPath: /var/lib/docker
+          readOnly: true
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: devdisk
+          mountPath: /dev/disk
+          readOnly: true
+        resources:
+          {{- toYaml .Values.cwinsights.resources | nindent 10 }}
+      volumes:
+      - name: cwagentconfig
+        configMap:
+          name: {{ include "logging-monitoring.fullname" . }}
+      - name: rootfs
+        hostPath:
+          path: /
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      - name: varlibdocker
+        hostPath:
+          path: /var/lib/docker
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: devdisk
+        hostPath:
+          path: /dev/disk/
+      terminationGracePeriodSeconds: 60
+{{- end -}}

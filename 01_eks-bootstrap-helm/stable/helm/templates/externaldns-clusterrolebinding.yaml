@@ -1,0 +1,15 @@
+{{- if and .Values.externaldns.serviceAccount.create .Values.externaldns.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: day0-bootstrap-awsexdnsc-bind
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: day0-bootstrap-awsexdnsc-role
+subjects:
+- kind: ServiceAccount
+  name: day0-bootstrap-awsexdnsc
+  namespace: kube-system
+{{- end -}}

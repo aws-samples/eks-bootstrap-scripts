@@ -1,0 +1,13 @@
+{
+    "MonitoringRole": "arn:aws:iam::12345678910:role/MonitoringRole",
+    "ExternalDnsControllerRole": "arn:aws:iam::12345678910:role/ExternalDnsControllerRole",
+    "EfsCsiDriverRole": "arn:aws:iam::12345678910:role/EfsCsiDriverRole",
+    "EksSecurityGroup": "sg-1234567890",
+    "AlbControllerRole": "arn:aws:iam::12345678910:role/AlbControllerRole",
+    "EksClusterName": "TEST_EKS_CLUSTER_NAME",
+    "EbsCsiDriverRole": "arn:aws:iam::12345678910:role/EbsCsiDriverRole",
+    "myVolume1" : "fs-12345678"
+}
+
+
+aws efs create-file-system --performance-mode generalPurpose --throughput-mode bursting --encrypted --region us-west-2 --tags Key=Name,Value=my-sample-file-system

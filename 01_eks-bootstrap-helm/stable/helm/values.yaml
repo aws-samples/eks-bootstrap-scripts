@@ -1,0 +1,90 @@
+global:
+  clusterName: defaultCluster
+  region: us-west-2
+awslbc:
+  enabled: true
+awsebscsi:
+  enabled: true
+  serviceAccount:
+    controller:
+      name: ebs-csi-controller-sa
+awsefscsi:
+  image:
+    repository: public.ecr.aws/r5v6s4k2/aws-efs-csi-driver
+  enabled: true
+  controller:
+    serviceAccount:
+      name: efs-csi-controller-sa
+role:
+  bind: false
+serviceAccountRoles: []
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: false
+  serviceAccount:
+    create: true
+fluentbit:
+  output:
+    kinesis:
+      enabled: false
+    s3:
+      enabled: false
+  image:
+    repository: public.ecr.aws/r5v6s4k2/aws-for-fluentbit
+    pullPolicy: IfNotPresent
+    tag: 2.14.0
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  serviceAccount:
+    create: true
+  hostNetwork: false
+cwprom:
+  image:
+    repository: public.ecr.aws/r5v6s4k2/cloudwatch-agent
+    tag: 1.247347.5b250583
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  serviceAccount:
+    create: true
+  hostNetwork: false
+cwinsights:
+  image:
+    repository: public.ecr.aws/r5v6s4k2/cloudwatch-agent
+    tag: 1.247345.36b249270
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  serviceAccount:
+    create: true
+    name: cwagent-insights
+  hostNetwork: false
+cniCustomNw:
+  enabled: false
+  cniSubnets: {}
+externaldns:
+  enabled: false
+  serviceAccount:
+    create: true
+  deployment:
+    args:
+      aws-zone-type: private
+efs: {}
+ebs: {}
+  

@@ -1,0 +1,14 @@
+#eks-bootstrap-helm/requirements.yaml
+dependencies:
+  - name: aws-load-balancer-controller
+    repository: https://github.com/aws/eks-charts/tree/master/stable/aws-load-balancer-controller
+    alias: awslbc
+    condition: awslbc.enabled
+  - name: aws-efs-csi-driver
+    repository: https://github.com/kubernetes-sigs/aws-efs-csi-driver
+    alias: awsefscsi
+    condition: awsefscsi.enabled
+  - name: aws-ebs-csi-driver
+    repository: https://github.com/kubernetes-sigs/aws-efs-csi-driver
+    alias: awsebscsi
+    condition: awsebscsi.enabled

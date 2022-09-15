@@ -1,0 +1,32 @@
+{{- if .Values.externaldns.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: day0-bootstrap-awsexdnsc-deployment
+  namespace: kube-system
+spec:
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: day0-bootstrap-awsexdnsc
+      containers:
+      - name: external-dns
+        image: {{ .Values.externaldns.deployment.image | default "k8s.gcr.io/external-dns/external-dns:v0.7.6" | quote }}
+        args: 
+        - --source=service
+        - --source=ingress
+        - --provider=aws
+        - --registry=txt
+        {{- range $key, $val := .Values.externaldns.deployment.args }}
+        - --{{ $key }}={{ $val }}
+        {{- end }}
+      securityContext:
+        fsGroup: 65534 # For ExternalDNS to be able to read Kubernetes and AWS token files
+{{- end -}}

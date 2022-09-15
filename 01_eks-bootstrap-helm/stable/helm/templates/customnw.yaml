@@ -1,0 +1,14 @@
+{{- if .Values.cniCustomNw.enabled -}}
+{{- range $key, $val := .Values.cniCustomNw.cniSubnet -}}
+{{ printf "\n" }}
+---
+apiVersion: crd.k8s.amazonaws.com/v1alpha1
+kind: ENIConfig
+metadata:
+ name: {{ $key }}
+spec:
+  subnet: {{ $val }}
+  securityGroups: 
+    - {{ $.Values.cniCustomNw.cniSG }}
+{{- end -}}
+{{- end -}}
