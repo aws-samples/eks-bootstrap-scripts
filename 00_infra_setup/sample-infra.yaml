@@ -1,1349 +1,820 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: | 
+              "************************************************** WARNING ********************************************************************* 
+              This template creates below resources. You will be billed for the AWS resources used if you create a stack from this template.
+                * AWS Code Commit Repository, AWS CodeBuild Project, AWS CodePipeline, Amazon ECR for packaging helm charts 
+                * AWS Code Commit Repository, AWS CodeBuild Project, AWS CodePipeline for bootstrapping AWS EKS Cluster.
+                * SSM Parameter store for storing & retrieving dynamic values.
+              *********************************************************************************************************************************
+              This is the SAMPLE cloudformation to create the intial infrastructure. It is not PROD ready and can only be used as starting point"
 Resources:
-    eksBootstrapHelmChartsRepo:
-        Type: 'AWS::CodeCommit::Repository'
-        Properties:
-            RepositoryName: eksBootstrapHelmChartsRepo
-        Metadata:
-            'aws:cdk:path': InfraSetupStack/eksBootstrapHelmChartsRepo/Resource
-    eksBootstrapHelmChartsRepoInfraSetupStackeksBootstrapHelmChartsPipelineEventRule:
-        Type: 'AWS::Events::Rule'
-        Properties:
-            EventPattern:
-                source:
-                    - aws.codecommit
-                resources:
-                    - 
-                        'Fn::GetAtt':
-                            - eksBootstrapHelmChartsRepo
-                            - Arn
-                detail-type:
-                    - CodeCommit Repository State Change
-                detail:
-                    event:
-                        - referenceCreated
-                        - referenceUpdated
-                    referenceName:
-                        - master
-            State: ENABLED
-            Targets:
-                - 
-                    Arn:
-                        'Fn::Join':
-                            - ''
-                            - 
-                                - 'arn:'
-                                - 
-                                    Ref: 'AWS::Partition'
-                                - ':codepipeline:'
-                                - 
-                                    Ref: 'AWS::Region'
-                                - ':'
-                                - 
-                                    Ref: 'AWS::AccountId'
-                                - ':'
-                                - 
-                                    Ref: eksBootstrapHelmChartsPipeline
-                    Id: Target0
-                    RoleArn:
-                        'Fn::GetAtt':
-                            - eksBootstrapHelmChartsPipelineEventsRole
-                            - Arn
-    helmEksBootstrap:
-        Type: 'AWS::ECR::Repository'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W28
-                reason: "Need explicit name"
-        Properties:
-            RepositoryName: helm-eks-bootstrap
-            ImageScanningConfiguration: 
-                ScanOnPush: true
-        UpdateReplacePolicy: Retain
-        DeletionPolicy: Retain
-    eksInfraCreateRepo:
-        Type: 'AWS::CodeCommit::Repository'
-        Properties:
-            RepositoryName: eksInfraCreateRepo
-    eksInfraCreateRepoInfraSetupStackeksInfraCreatePipelineEventRule:
-        Type: 'AWS::Events::Rule'
-        Properties:
-            EventPattern:
-                source:
-                    - aws.codecommit
-                resources:
-                    - 
-                        'Fn::GetAtt':
-                            - eksInfraCreateRepo
-                            - Arn
-                detail-type:
-                    - CodeCommit Repository State Change
-                detail:
-                    event:
-                        - referenceCreated
-                        - referenceUpdated
-                    referenceName:
-                        - main
-            State: ENABLED
-            Targets:
-                - 
-                    Arn:
-                        'Fn::Join':
-                            - ''
-                            - 
-                                - 'arn:'
-                                - 
-                                    Ref: 'AWS::Partition'
-                                - ':codepipeline:'
-                                - 
-                                    Ref: 'AWS::Region'
-                                - ':'
-                                - 
-                                    Ref: 'AWS::AccountId'
-                                - ':'
-                                - 
-                                    Ref: eksInfraCreatePipeline
-                    Id: Target0
-                    RoleArn:
-                        'Fn::GetAtt':
-                            - eksInfraCreatePipelineEventsRole
-                            - Arn
-    eksBootstrapHelmChartsPipelineRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            Service: codepipeline.amazonaws.com
-                Version: '2012-10-17'
-            Description: Role used by CodePipelines to create Helm Charts Pipeline
-    eksBootstrapHelmChartsPipelineRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W12
-                reason: "Exact name unknown beforehand"
-              - id: W76
-                reason: "Exact name unknown beforehand"
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 'codebuild:BatchPutCodeCoverages'
-                            - 'codebuild:BatchPutTestCases'
-                            - 'codebuild:CreateReport'
-                            - 'codebuild:CreateReportGroup'
-                            - 'codebuild:UpdateReport'
-                            - 'logs:CreateLogGroup'
-                            - 'logs:CreateLogStream'
-                            - 'logs:PutLogEvents'
-                        Effect: Allow
-                        Resource: '*'
-                    - 
-                        Action:
-                            - 'ecr:BatchCheckLayerAvailability'
-                            - 'ecr:BatchGetImage'
-                            - 'ecr:CompleteLayerUpload'
-                            - 'ecr:DescribeImages'
-                            - 'ecr:DescribeRepositories'
-                            - 'ecr:GetAuthorizationToken'
-                            - 'ecr:GetDownloadUrlForLayer'
-                            - 'ecr:InitiateLayerUpload'
-                            - 'ecr:PutImage'
-                            - 'ecr:UploadLayerPart'
-                        Effect: Allow
-                        Resource: !GetAtt helmEksBootstrap.Arn
-                    - 
-                        Action:
-                            - 's3:Abort*'
-                            - 's3:DeleteObject*'
-                            - 's3:GetBucket*'
-                            - 's3:GetObject*'
-                            - 's3:List*'
-                            - 's3:PutObject'
-                            - 's3:PutObjectLegalHold'
-                            - 's3:PutObjectRetention'
-                            - 's3:PutObjectTagging'
-                            - 's3:PutObjectVersionTagging'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksInfraCreatePipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                    - 
-                        Action:
-                            - 'kms:Decrypt'
-                            - 'kms:DescribeKey'
-                            - 'kms:Encrypt'
-                            - 'kms:GenerateDataKey*'
-                            - 'kms:ReEncrypt*'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                                    - Arn
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                                    - Arn
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole
-                                    - Arn
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole
-                                    - Arn
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole
-                                    - Arn
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineUpdateCodeBuildActionRole
-                                    - Arn
-                Version: '2012-10-17'
-            PolicyName: eksBootstrapHelmChartsPipelineRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksBootstrapHelmChartsPipelineRole
-    eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey:
-        Type: 'AWS::KMS::Key'
-        Properties:
-            EnableKeyRotation: true
-            KeyPolicy:
-                Statement:
-                    - 
-                        Action: 'kms:*'
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                        Resource: '*'
-                Version: '2012-10-17'
-        UpdateReplacePolicy: Delete
-        DeletionPolicy: Delete
-        
-    eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKeyAlias:
-        Type: 'AWS::KMS::Alias'
-        Properties:
-            AliasName: alias/eksbootstraphelmchartspipeline
-            TargetKeyId:
-                'Fn::GetAtt':
-                    - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                    - Arn
-        UpdateReplacePolicy: Delete
-        DeletionPolicy: Delete
-    eksBootstrapHelmChartsPipelineArtifactsBucket:
-        Type: 'AWS::S3::Bucket'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W35
-                reason: "This is a sample configuration and access logging need to be enabled per customer requirement"
-        Properties:
-            BucketEncryption:
-                ServerSideEncryptionConfiguration:
-                    - 
-                        ServerSideEncryptionByDefault:
-                            KMSMasterKeyID:
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                                    - Arn
-                            SSEAlgorithm: 'aws:kms'
-            PublicAccessBlockConfiguration:
-                BlockPublicAcls: true
-                BlockPublicPolicy: true
-                IgnorePublicAcls: true
-                RestrictPublicBuckets: true
-        UpdateReplacePolicy: Retain
-        DeletionPolicy: Retain
-    eksBootstrapHelmChartsPipelineArtifactsBucketPolicy:
-        Type: 'AWS::S3::BucketPolicy'
-        Properties:
-            Bucket:
-                Ref: eksBootstrapHelmChartsPipelineArtifactsBucket
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action: 's3:*'
-                        Condition:
-                            Bool:
-                                'aws:SecureTransport': 'false'
-                        Effect: Deny
-                        Principal:
-                            AWS: '*'
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                Version: '2012-10-17'
-    eksBootstrapHelmChartsPipeline:
-        Type: 'AWS::CodePipeline::Pipeline'
-        Properties:
-            RoleArn:
-                'Fn::GetAtt':
-                    - eksBootstrapHelmChartsPipelineRole
-                    - Arn
-            Stages:
-                - 
-                    Actions:
-                        - 
-                            ActionTypeId:
-                                Category: Source
-                                Owner: AWS
-                                Provider: CodeCommit
-                                Version: '1'
-                            Configuration:
-                                RepositoryName:
-                                    'Fn::GetAtt':
-                                        - eksBootstrapHelmChartsRepo
-                                        - Name
-                                BranchName: master
-                                PollForSourceChanges: false
-                            Name:
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsRepo
-                                    - Name
-                            OutputArtifacts:
-                                - 
-                                    Name: c88d86c1953dda8f51b65e0fd6cbdc2c1ebc53addf_Source
-                            RoleArn:
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole
-                                    - Arn
-                            RunOrder: 1
-                    Name: Source
-                - 
-                    Actions:
-                        - 
-                            ActionTypeId:
-                                Category: Build
-                                Owner: AWS
-                                Provider: CodeBuild
-                                Version: '1'
-                            Configuration:
-                                ProjectName:
-                                    Ref: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject
-                            InputArtifacts:
-                                - 
-                                    Name: c88d86c1953dda8f51b65e0fd6cbdc2c1ebc53addf_Source
-                            Name: SynthStep
-                            OutputArtifacts:
-                                - 
-                                    Name: SynthStep_Output
-                            RoleArn:
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole
-                                    - Arn
-                            RunOrder: 1
-                    Name: Build
-            ArtifactStore:
-                EncryptionKey:
-                    Id:
-                        'Fn::GetAtt':
-                            - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                            - Arn
-                    Type: KMS
-                Location:
-                    Ref: eksBootstrapHelmChartsPipelineArtifactsBucket
-                Type: S3
-        DependsOn:
-            - eksBootstrapHelmChartsPipelineRoleDefaultPolicy
-            - eksBootstrapHelmChartsPipelineRole
-    eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                Version: '2012-10-17'
-    eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 's3:Abort*'
-                            - 's3:DeleteObject*'
-                            - 's3:GetBucket*'
-                            - 's3:GetObject*'
-                            - 's3:List*'
-                            - 's3:PutObject'
-                            - 's3:PutObjectLegalHold'
-                            - 's3:PutObjectRetention'
-                            - 's3:PutObjectTagging'
-                            - 's3:PutObjectVersionTagging'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                    - 
-                        Action:
-                            - 'kms:Decrypt'
-                            - 'kms:DescribeKey'
-                            - 'kms:Encrypt'
-                            - 'kms:GenerateDataKey*'
-                            - 'kms:ReEncrypt*'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                                - Arn
-                    - 
-                        Action:
-                            - 'codecommit:CancelUploadArchive'
-                            - 'codecommit:GetBranch'
-                            - 'codecommit:GetCommit'
-                            - 'codecommit:GetUploadArchiveStatus'
-                            - 'codecommit:UploadArchive'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksBootstrapHelmChartsRepo
-                                - Arn
-                Version: '2012-10-17'
-            PolicyName: eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole
-    eksBootstrapHelmChartsPipelineEventsRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            Service: events.amazonaws.com
-                Version: '2012-10-17'
-    eksBootstrapHelmChartsPipelineEventsRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action: 'codepipeline:StartPipelineExecution'
-                        Effect: Allow
-                        Resource:
-                            'Fn::Join':
-                                - ''
-                                - 
-                                    - 'arn:'
-                                    - 
-                                        Ref: 'AWS::Partition'
-                                    - ':codepipeline:'
-                                    - 
-                                        Ref: 'AWS::Region'
-                                    - ':'
-                                    - 
-                                        Ref: 'AWS::AccountId'
-                                    - ':'
-                                    - 
-                                        Ref: eksBootstrapHelmChartsPipeline
-                Version: '2012-10-17'
-            PolicyName: eksBootstrapHelmChartsPipelineEventsRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksBootstrapHelmChartsPipelineEventsRole
-    eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            Service: codebuild.amazonaws.com
-                Version: '2012-10-17'
-    eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W12
-                reason: "Exact name unkown beforehand"
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 'logs:CreateLogGroup'
-                            - 'logs:CreateLogStream'
-                            - 'logs:PutLogEvents'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':logs:'
-                                        - 
-                                            Ref: 'AWS::Region'
-                                        - ':'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':log-group:/aws/codebuild/'
-                                        - 
-                                            Ref: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject
-                                        - ':*'
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':logs:'
-                                        - 
-                                            Ref: 'AWS::Region'
-                                        - ':'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':log-group:/aws/codebuild/'
-                                        - 
-                                            Ref: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject
-                    - 
-                        Action:
-                            - 'codebuild:BatchPutCodeCoverages'
-                            - 'codebuild:BatchPutTestCases'
-                            - 'codebuild:CreateReport'
-                            - 'codebuild:CreateReportGroup'
-                            - 'codebuild:UpdateReport'
-                        Effect: Allow
-                        Resource:
-                            'Fn::Join':
-                                - ''
-                                - 
-                                    - 'arn:'
-                                    - 
-                                        Ref: 'AWS::Partition'
-                                    - ':codebuild:'
-                                    - 
-                                        Ref: 'AWS::Region'
-                                    - ':'
-                                    - 
-                                        Ref: 'AWS::AccountId'
-                                    - ':report-group/'
-                                    - 
-                                        Ref: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject
-                                    - '-*'
-                    - 
-                        Action:
-                            - 'ecr:BatchCheckLayerAvailability'
-                            - 'ecr:BatchGetImage'
-                            - 'ecr:CompleteLayerUpload'
-                            - 'ecr:DescribeImages'
-                            - 'ecr:DescribeRepositories'
-                            - 'ecr:GetAuthorizationToken'
-                            - 'ecr:GetDownloadUrlForLayer'
-                            - 'ecr:InitiateLayerUpload'
-                            - 'ecr:PutImage'
-                            - 'ecr:UploadLayerPart'
-                        Effect: Allow
-                        Resource: !GetAtt helmEksBootstrap.Arn
-                    - 
-                        Action:
-                            - 's3:Abort*'
-                            - 's3:DeleteObject*'
-                            - 's3:GetBucket*'
-                            - 's3:GetObject*'
-                            - 's3:List*'
-                            - 's3:PutObject'
-                            - 's3:PutObjectLegalHold'
-                            - 's3:PutObjectRetention'
-                            - 's3:PutObjectTagging'
-                            - 's3:PutObjectVersionTagging'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksBootstrapHelmChartsPipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                    - 
-                        Action:
-                            - 'kms:Decrypt'
-                            - 'kms:DescribeKey'
-                            - 'kms:Encrypt'
-                            - 'kms:GenerateDataKey*'
-                            - 'kms:ReEncrypt*'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                                - Arn
-                Version: '2012-10-17'
-            PolicyName: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole
-    eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject:
-        Type: 'AWS::CodeBuild::Project'
-        Properties:
-            Artifacts:
-                Type: CODEPIPELINE
-            Environment:
-                ComputeType: BUILD_GENERAL1_MEDIUM
-                Image: 'aws/codebuild/standard:5.0'
-                ImagePullCredentialsType: CODEBUILD
-                PrivilegedMode: true
-                Type: LINUX_CONTAINER
-            ServiceRole:
-                'Fn::GetAtt':
-                    - eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole
-                    - Arn
-            Source:
-                BuildSpec: |
-                            {
-                                "phases": {
-                                "install": {
-                                    "runtime-versions": {
-                                    "python": "3.8"
-                                    },
-                                    "commands": [
-                                    "HELM_DOWNLOAD_URL=https://get.helm.sh/helm-v3.5.4-linux-amd64.tar.gz",
-                                    "wget -q $HELM_DOWNLOAD_URL",
-                                    "tar -zxvf helm-v3.5.4-linux-amd64.tar.gz",
-                                    "mv linux-amd64/helm /usr/local/bin/helm",
-                                    "export AWS_ACCOUNT=$(aws sts get-caller-identity --output text --query \"Account\")",
-                                    "export HELM_EXPERIMENTAL_OCI=1",
-                                    "aws ecr get-login-password | helm registry login --username AWS --password-stdin $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com"
-                                    ]
-                                },
-                                "build": {
-                                    "commands": [
-                                    "export CHARTVERSION=$(cat stable/helm/Chart.yaml | grep version | awk {'print $2'})",
-                                    "helm chart save stable/helm/ $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$CHARTVERSION",
-                                    "helm chart push $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$CHARTVERSION"
-                                    ]
-                                }
-                                },
-                                "version": "0.2"
-                            }
-                Type: CODEPIPELINE
-            Cache:
-                Type: NO_CACHE
-            Description: Pipeline step InfraSetupStack/eksBootstrapHelmChartsPipeline/Build/SynthStep
-            EncryptionKey:
-                'Fn::GetAtt':
-                    - eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey
-                    - Arn
-        Metadata:
-            'aws:cdk:path': InfraSetupStack/eksBootstrapHelmChartsPipeline/Build/SynthStep/CdkBuildProject/Resource
-    eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Condition:
-                            Bool:
-                                'aws:ViaAWSService': codepipeline.amazonaws.com
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                Version: '2012-10-17'
-    eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 'codebuild:BatchGetBuilds'
-                            - 'codebuild:StartBuild'
-                            - 'codebuild:StopBuild'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject
-                                - Arn
-                Version: '2012-10-17'
-            PolicyName: eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole
-    eksInfraCreatePipelineArtifactsBucketEncryptionKey:
-        Type: 'AWS::KMS::Key'
-        Properties:
-            EnableKeyRotation: true
-            KeyPolicy:
-                Statement:
-                    - 
-                        Action: 'kms:*'
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                        Resource: '*'
-                Version: '2012-10-17'
-        UpdateReplacePolicy: Delete
-        DeletionPolicy: Delete
-    eksInfraCreatePipelineArtifactsBucketEncryptionKeyAlias:
-        Type: 'AWS::KMS::Alias'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W35
-                reason: "This is a sample configuration and access logging need to be enabled per customer requirement"
-        Properties:
-            AliasName: alias/eksinfracreatepipeline-808e1cfc
-            TargetKeyId:
-                'Fn::GetAtt':
-                    - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                    - Arn
-        UpdateReplacePolicy: Delete
-        DeletionPolicy: Delete
-    eksInfraCreatePipelineArtifactsBucket:
-        Type: 'AWS::S3::Bucket'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W35
-                reason: "This is a sample configuration and access logging need to be enabled per customer requirement"
-        Properties:
-            BucketEncryption:
-                ServerSideEncryptionConfiguration:
-                    - 
-                        ServerSideEncryptionByDefault:
-                            KMSMasterKeyID:
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                                    - Arn
-                            SSEAlgorithm: 'aws:kms'
-            PublicAccessBlockConfiguration:
-                BlockPublicAcls: true
-                BlockPublicPolicy: true
-                IgnorePublicAcls: true
-                RestrictPublicBuckets: true
-        UpdateReplacePolicy: Retain
-        DeletionPolicy: Retain
-    eksInfraCreatePipelineArtifactsBucketPolicy:
-        Type: 'AWS::S3::BucketPolicy'
-        Properties:
-            Bucket:
-                Ref: eksInfraCreatePipelineArtifactsBucket
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action: 's3:*'
-                        Condition:
-                            Bool:
-                                'aws:SecureTransport': 'false'
-                        Effect: Deny
-                        Principal:
-                            AWS: '*'
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksInfraCreatePipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                Version: '2012-10-17'
-    eksInfraCreatePipeline:
-        Type: 'AWS::CodePipeline::Pipeline'
-        Properties:
-            RoleArn:
-                'Fn::GetAtt':
-                    - eksBootstrapHelmChartsPipelineRole
-                    - Arn
-            Stages:
-                - 
-                    Actions:
-                        - 
-                            ActionTypeId:
-                                Category: Source
-                                Owner: AWS
-                                Provider: CodeCommit
-                                Version: '1'
-                            Configuration:
-                                RepositoryName:
-                                    'Fn::GetAtt':
-                                        - eksInfraCreateRepo
-                                        - Name
-                                BranchName: main
-                                PollForSourceChanges: false
-                            Name:
-                                'Fn::GetAtt':
-                                    - eksInfraCreateRepo
-                                    - Name
-                            OutputArtifacts:
-                                - 
-                                    Name: c8a4b8179d688a619ec0c65a73c481541dba2b023c_Source
-                            RoleArn:
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole
-                                    - Arn
-                            RunOrder: 1
-                    Name: Source
-                - 
-                    Actions:
-                        - 
-                            ActionTypeId:
-                                Category: Build
-                                Owner: AWS
-                                Provider: CodeBuild
-                                Version: '1'
-                            Configuration:
-                                ProjectName:
-                                    Ref: eksInfraCreatePipelineBuildSynthStepCdkBuildProject
-                            InputArtifacts:
-                                - 
-                                    Name: c8a4b8179d688a619ec0c65a73c481541dba2b023c_Source
-                            Name: SynthStep
-                            OutputArtifacts:
-                                - 
-                                    Name: SynthStep_Output
-                            RoleArn:
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineUpdateCodeBuildActionRole
-                                    - Arn
-                            RunOrder: 1
-                    Name: Build
-            ArtifactStore:
-                EncryptionKey:
-                    Id:
-                        'Fn::GetAtt':
-                            - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                            - Arn
-                    Type: KMS
-                Location:
-                    Ref: eksInfraCreatePipelineArtifactsBucket
-                Type: S3
-        DependsOn:
-            - eksBootstrapHelmChartsPipelineRoleDefaultPolicy
-            - eksBootstrapHelmChartsPipelineRole
-    eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                Version: '2012-10-17'
-    eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 's3:Abort*'
-                            - 's3:DeleteObject*'
-                            - 's3:GetBucket*'
-                            - 's3:GetObject*'
-                            - 's3:List*'
-                            - 's3:PutObject'
-                            - 's3:PutObjectLegalHold'
-                            - 's3:PutObjectRetention'
-                            - 's3:PutObjectTagging'
-                            - 's3:PutObjectVersionTagging'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksInfraCreatePipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                    - 
-                        Action:
-                            - 'kms:Decrypt'
-                            - 'kms:DescribeKey'
-                            - 'kms:Encrypt'
-                            - 'kms:GenerateDataKey*'
-                            - 'kms:ReEncrypt*'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                                - Arn
-                    - 
-                        Action:
-                            - 'codecommit:CancelUploadArchive'
-                            - 'codecommit:GetBranch'
-                            - 'codecommit:GetCommit'
-                            - 'codecommit:GetUploadArchiveStatus'
-                            - 'codecommit:UploadArchive'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksInfraCreateRepo
-                                - Arn
-                Version: '2012-10-17'
-            PolicyName: eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole
-    eksInfraCreatePipelineEventsRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            Service: events.amazonaws.com
-                Version: '2012-10-17'
-        Metadata:
-            'aws:cdk:path': InfraSetupStack/eksInfraCreatePipeline/EventsRole/Resource
-    eksInfraCreatePipelineEventsRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action: 'codepipeline:StartPipelineExecution'
-                        Effect: Allow
-                        Resource:
-                            'Fn::Join':
-                                - ''
-                                - 
-                                    - 'arn:'
-                                    - 
-                                        Ref: 'AWS::Partition'
-                                    - ':codepipeline:'
-                                    - 
-                                        Ref: 'AWS::Region'
-                                    - ':'
-                                    - 
-                                        Ref: 'AWS::AccountId'
-                                    - ':'
-                                    - 
-                                        Ref: eksInfraCreatePipeline
-                Version: '2012-10-17'
-            PolicyName: eksInfraCreatePipelineEventsRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksInfraCreatePipelineEventsRole
-    eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Effect: Allow
-                        Principal:
-                            Service: codebuild.amazonaws.com
-                Version: '2012-10-17'
-    eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Metadata:
-          cfn_nag:
-            rules_to_suppress:
-              - id: W12
-                reason: "This is a role for which we will not be aware of the exact name beforehands"
-              - id: F4
-                reason: "This is a role for which we will not be aware of the exact name beforehands"
-              - id: W76
-                reason: "This is a role for which we will not be aware of the exact name beforehands"
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 'logs:CreateLogGroup'
-                            - 'logs:CreateLogStream'
-                            - 'logs:PutLogEvents'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':logs:'
-                                        - 
-                                            Ref: 'AWS::Region'
-                                        - ':'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':log-group:/aws/codebuild/'
-                                        - 
-                                            Ref: eksInfraCreatePipelineBuildSynthStepCdkBuildProject
-                                        - ':*'
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':logs:'
-                                        - 
-                                            Ref: 'AWS::Region'
-                                        - ':'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':log-group:/aws/codebuild/'
-                                        - 
-                                            Ref: eksInfraCreatePipelineBuildSynthStepCdkBuildProject
-                    - 
-                        Action:
-                            - 'codebuild:BatchPutCodeCoverages'
-                            - 'codebuild:BatchPutTestCases'
-                            - 'codebuild:CreateReport'
-                            - 'codebuild:CreateReportGroup'
-                            - 'codebuild:UpdateReport'
-                        Effect: Allow
-                        Resource:
-                            'Fn::Join':
-                                - ''
-                                - 
-                                    - 'arn:'
-                                    - 
-                                        Ref: 'AWS::Partition'
-                                    - ':codebuild:'
-                                    - 
-                                        Ref: 'AWS::Region'
-                                    - ':'
-                                    - 
-                                        Ref: 'AWS::AccountId'
-                                    - ':report-group/'
-                                    - 
-                                        Ref: eksInfraCreatePipelineBuildSynthStepCdkBuildProject
-                                    - '-*'
-                    - 
-                        Action:
-                            - 'ecr:BatchCheckLayerAvailability'
-                            - 'ecr:BatchGetImage'
-                            - 'ecr:CompleteLayerUpload'
-                            - 'ecr:DescribeImages'
-                            - 'ecr:DescribeRepositories'
-                            - 'ecr:GetAuthorizationToken'
-                            - 'ecr:GetDownloadUrlForLayer'
-                            - 'ecr:InitiateLayerUpload'
-                            - 'ecr:PutImage'
-                            - 'ecr:UploadLayerPart'
-                        Effect: Allow
-                        Resource: !GetAtt helmEksBootstrap.Arn
-                    - 
-                        Action:
-                            - 'codeartifact:GetAuthorizationToken'
-                            - 'sts:GetServiceBearerToken'
-                            - 'codeartifact:*'
-                        Effect: Allow
-                        Resource: '*'
-                    - 
-                        Action:
-                            - 's3:Abort*'
-                            - 's3:DeleteObject*'
-                            - 's3:GetBucket*'
-                            - 's3:GetObject*'
-                            - 's3:List*'
-                            - 's3:PutObject'
-                            - 's3:PutObjectLegalHold'
-                            - 's3:PutObjectRetention'
-                            - 's3:PutObjectTagging'
-                            - 's3:PutObjectVersionTagging'
-                        Effect: Allow
-                        Resource:
-                            - 
-                                'Fn::GetAtt':
-                                    - eksInfraCreatePipelineArtifactsBucket
-                                    - Arn
-                            - 
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 
-                                            'Fn::GetAtt':
-                                                - eksInfraCreatePipelineArtifactsBucket
-                                                - Arn
-                                        - '/*'
-                    - 
-                        Action:
-                            - 'kms:Decrypt'
-                            - 'kms:DescribeKey'
-                            - 'kms:Encrypt'
-                            - 'kms:GenerateDataKey*'
-                            - 'kms:ReEncrypt*'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                                - Arn
-                    - 
-                        Action:
-                            - 'ssm:GetParameters'
-                        Effect: Allow
-                        Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/EKS_OUT_SSM'
-                    - 
-                        Action:
-                            - 'eks:DescribeCluster'
-                        Effect: Allow
-                        Resource: !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/sample-cluster'
-                    - 
-                        Action:
-                            - 'sts:AssumeRole'
-                        Effect: Allow
-                        Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/eksctl-sample-cluster*'
-                Version: '2012-10-17'
-            PolicyName: eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole
-    eksInfraCreatePipelineBuildSynthStepCdkBuildProject:
-        Type: 'AWS::CodeBuild::Project'
-        Properties:
-            Artifacts:
-                Type: CODEPIPELINE
-            Environment:
-                ComputeType: BUILD_GENERAL1_MEDIUM
-                Image: 'aws/codebuild/standard:5.0'
-                ImagePullCredentialsType: CODEBUILD
-                PrivilegedMode: true
-                Type: LINUX_CONTAINER
-            ServiceRole:
-                'Fn::GetAtt':
-                    - eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole
-                    - Arn
-            Source:
-                BuildSpec: |
-                            {
-                                "phases": {
-                                "install": {
-                                    "runtime-versions": {
-                                    "python": "3.8"
-                                    },
-                                    "commands": [
-                                    "HELM_DOWNLOAD_URL=https://get.helm.sh/helm-v3.5.4-linux-amd64.tar.gz",
-                                    "wget -q $HELM_DOWNLOAD_URL",
-                                    "tar -zxvf helm-v3.5.4-linux-amd64.tar.gz",
-                                    "mv linux-amd64/helm /usr/local/bin/helm",
-                                    "aws codeartifact login --tool pip --repository bootstrap-scripts-python --domain eks-bootstrap --domain-owner $(aws sts get-caller-identity --output text --query \"Account\") --region us-west-2",
-                                    "pip install ruamel.yaml==0.17.10 -i https://pypi.python.org/simple",
-                                    "pip install deepmerge==0.3.0 -i https://pypi.python.org/simple",
-                                    "pip install jsonpath-ng==1.5.2 -i https://pypi.python.org/simple",
-                                    "pip install bootstrap-cli",
-                                    "export HELM_EXPERIMENTAL_OCI=1",
-                                    "aws ecr get-login-password | helm registry login --username AWS --password-stdin  $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com",
-                                    "helm version",
-                                    "curl -LO \"https://dl.k8s.io/release/v1.22.0/bin/linux/amd64/kubectl\"",
-                                    "chmod +x kubectl",
-                                    "mkdir -p ~/.local/bin",
-                                    "mv ./kubectl ~/.local/bin/kubectl"
-                                    ]
-                                },
-                                "build": {
-                                    "commands": [
-                                    "export BOOTSTRAP_DEFAULT_REPO=$(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com",
-                                    "export BOOTSTRAP_HELM_DEFAULT_IMAGE=helm-eks-bootstrap",
-                                    "aws ecr get-login-password | helm registry login --username AWS --password-stdin $BOOTSTRAP_DEFAULT_REPO",
-                                    "export HELM_IMAGE_TAG=1.0",
-                                    "CDK_OUTPUT=$(aws ssm get-parameters --names \"EKS_OUT_SSM\" --query \"Parameters[*].Value\"  --output text)",
-                                    "echo $CDK_OUTPUT > artifact.json",
-                                    "export HELMD_awslbc__clusterName=\"sample-cluster\"",
-                                    "export HELMD_global__clusterName=\"sample-cluster\"", 
-                                    "export HELMD_clusterName=\"sample-cluster\"", 
-                                    "aws eks update-kubeconfig --name sample-cluster  --region us-west-2 ",
-                                    "kubectl get pods -A",
-                                    "bootstrap-cli --template --print_values --release helm-bootstrap --json \"config.json\" --artifact \"artifact.json\" --upgrade --context environment:HELMD_ --helm_arg=\"-n kube-system\""
-                                    ]
-                                }
-                                },
-                                "version": "0.2"
-                            }                                         
-                Type: CODEPIPELINE
-            Cache:
-                Type: NO_CACHE
-            Description: Pipeline step InfraSetupStack/eksInfraCreatePipeline/Build/SynthStep
-            EncryptionKey:
-                'Fn::GetAtt':
-                    - eksInfraCreatePipelineArtifactsBucketEncryptionKey
-                    - Arn
-    eksInfraCreatePipelineUpdateCodeBuildActionRole:
-        Type: 'AWS::IAM::Role'
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                    - 
-                        Action: 'sts:AssumeRole'
-                        Condition:
-                            Bool:
-                                'aws:ViaAWSService': codepipeline.amazonaws.com
-                        Effect: Allow
-                        Principal:
-                            AWS:
-                                'Fn::Join':
-                                    - ''
-                                    - 
-                                        - 'arn:'
-                                        - 
-                                            Ref: 'AWS::Partition'
-                                        - ':iam::'
-                                        - 
-                                            Ref: 'AWS::AccountId'
-                                        - ':root'
-                Version: '2012-10-17'
-    eksInfraCreatePipelineUpdateCodeBuildActionRoleDefaultPolicy:
-        Type: 'AWS::IAM::Policy'
-        Properties:
-            PolicyDocument:
-                Statement:
-                    - 
-                        Action:
-                            - 'codebuild:BatchGetBuilds'
-                            - 'codebuild:StartBuild'
-                            - 'codebuild:StopBuild'
-                        Effect: Allow
-                        Resource:
-                            'Fn::GetAtt':
-                                - eksInfraCreatePipelineBuildSynthStepCdkBuildProject
-                                - Arn
-                Version: '2012-10-17'
-            PolicyName: eksInfraCreatePipelineUpdateCodeBuildActionRoleDefaultPolicy
-            Roles:
-                - 
-                    Ref: eksInfraCreatePipelineUpdateCodeBuildActionRole
-    
+  eksBootstrapHelmChartsRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: eksBootstrapHelmChartsRepo
+  eksBootstrapHelmChartsRepoInfraSetupStackeksBootstrapHelmChartsPipelineEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        resources:
+          - !GetAtt 'eksBootstrapHelmChartsRepo.Arn'
+        detail-type:
+          - CodeCommit Repository State Change
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceName:
+            - master
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${eksBootstrapHelmChartsPipeline}'
+          Id: Target0
+          RoleArn: !GetAtt 'eksBootstrapHelmChartsPipelineEventsRole.Arn'
+  helmEksBootstrap:
+    Type: AWS::ECR::Repository
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: Need explicit name
+    Properties:
+      RepositoryName: helm-eks-bootstrap
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  eksInfraCreateRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: eksInfraCreateRepo
+  eksInfraCreateRepoInfraSetupStackeksInfraCreatePipelineEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.codecommit
+        resources:
+          - !GetAtt 'eksInfraCreateRepo.Arn'
+        detail-type:
+          - CodeCommit Repository State Change
+        detail:
+          event:
+            - referenceCreated
+            - referenceUpdated
+          referenceName:
+            - main
+      State: ENABLED
+      Targets:
+        - Arn: !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${eksInfraCreatePipeline}'
+          Id: Target0
+          RoleArn: !GetAtt 'eksInfraCreatePipelineEventsRole.Arn'
+  eksBootstrapHelmChartsPipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+        Version: '2012-10-17'
+      Description: Role used by CodePipelines to create Helm Charts Pipeline
+  eksBootstrapHelmChartsPipelineRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W12
+            reason: Exact name unknown beforehand
+          - id: W76
+            reason: Exact name unknown beforehand
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codebuild:CreateReport
+              - codebuild:CreateReportGroup
+              - codebuild:UpdateReport
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:DescribeImages
+              - ecr:DescribeRepositories
+              - ecr:GetAuthorizationToken
+              - ecr:GetDownloadUrlForLayer
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Effect: Allow
+            Resource: !GetAtt 'helmEksBootstrap.Arn'
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucket.Arn'
+              - !GetAtt 'eksInfraCreatePipelineArtifactsBucket.Arn'
+              - !Sub '${eksBootstrapHelmChartsPipelineArtifactsBucket.Arn}/*'
+              - !Sub '${eksInfraCreatePipelineArtifactsBucket.Arn}/*'
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+              - !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole.Arn'
+              - !GetAtt 'eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole.Arn'
+              - !GetAtt 'eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole.Arn'
+              - !GetAtt 'eksInfraCreatePipelineUpdateCodeBuildActionRole.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksBootstrapHelmChartsPipelineRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksBootstrapHelmChartsPipelineRole'
+  eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      EnableKeyRotation: true
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Resource: '*'
+        Version: '2012-10-17'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+  eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/eksbootstraphelmchartspipeline
+      TargetKeyId: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+  eksBootstrapHelmChartsPipelineArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: This is a sample configuration and access logging need to be enabled per customer requirement
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  eksBootstrapHelmChartsPipelineArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref 'eksBootstrapHelmChartsPipelineArtifactsBucket'
+      PolicyDocument:
+        Statement:
+          - Action: s3:*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Effect: Deny
+            Principal:
+              AWS: '*'
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucket.Arn'
+              - !Sub '${eksBootstrapHelmChartsPipelineArtifactsBucket.Arn}/*'
+        Version: '2012-10-17'
+  eksBootstrapHelmChartsPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt 'eksBootstrapHelmChartsPipelineRole.Arn'
+      Stages:
+        - Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !GetAtt 'eksBootstrapHelmChartsRepo.Name'
+                BranchName: master
+                PollForSourceChanges: false
+              Name: !GetAtt 'eksBootstrapHelmChartsRepo.Name'
+              OutputArtifacts:
+                - Name: c88d86c1953dda8f51b65e0fd6cbdc2c1ebc53addf_Source
+              RoleArn: !GetAtt 'eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole.Arn'
+              RunOrder: 1
+          Name: Source
+        - Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject'
+              InputArtifacts:
+                - Name: c88d86c1953dda8f51b65e0fd6cbdc2c1ebc53addf_Source
+              Name: SynthStep
+              OutputArtifacts:
+                - Name: SynthStep_Output
+              RoleArn: !GetAtt 'eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole.Arn'
+              RunOrder: 1
+          Name: Build
+      ArtifactStore:
+        EncryptionKey:
+          Id: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+          Type: KMS
+        Location: !Ref 'eksBootstrapHelmChartsPipelineArtifactsBucket'
+        Type: S3
+    DependsOn:
+      - eksBootstrapHelmChartsPipelineRoleDefaultPolicy
+  eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+        Version: '2012-10-17'
+  eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucket.Arn'
+              - !Sub '${eksBootstrapHelmChartsPipelineArtifactsBucket.Arn}/*'
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Effect: Allow
+            Resource: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+          - Action:
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:UploadArchive
+            Effect: Allow
+            Resource: !GetAtt 'eksBootstrapHelmChartsRepo.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksBootstrapHelmChartsPipelineSourceCodeCommitCodePipelineActionRole'
+  eksBootstrapHelmChartsPipelineEventsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: '2012-10-17'
+  eksBootstrapHelmChartsPipelineEventsRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: codepipeline:StartPipelineExecution
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${eksBootstrapHelmChartsPipeline}'
+        Version: '2012-10-17'
+      PolicyName: eksBootstrapHelmChartsPipelineEventsRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksBootstrapHelmChartsPipelineEventsRole'
+  eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+        Version: '2012-10-17'
+  eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W12
+            reason: Exact name unkown beforehand
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject}:*'
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject}'
+          - Action:
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codebuild:CreateReport
+              - codebuild:CreateReportGroup
+              - codebuild:UpdateReport
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject}-*'
+          - Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:DescribeImages
+              - ecr:DescribeRepositories
+              - ecr:GetAuthorizationToken
+              - ecr:GetDownloadUrlForLayer
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Effect: Allow
+            Resource: !GetAtt 'helmEksBootstrap.Arn'
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucket.Arn'
+              - !Sub '${eksBootstrapHelmChartsPipelineArtifactsBucket.Arn}/*'
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Effect: Allow
+            Resource: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole'
+  eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt 'eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProjectRole.Arn'
+      Source:
+        BuildSpec: |
+          {
+              "phases": {
+              "install": {
+                  "runtime-versions": {
+                  "python": "3.8"
+                  },
+                  "commands": [
+                  "HELM_DOWNLOAD_URL=https://get.helm.sh/helm-v3.5.4-linux-amd64.tar.gz",
+                  "wget -q $HELM_DOWNLOAD_URL",
+                  "tar -zxvf helm-v3.5.4-linux-amd64.tar.gz",
+                  "mv linux-amd64/helm /usr/local/bin/helm",
+                  "export AWS_ACCOUNT=$(aws sts get-caller-identity --output text --query \"Account\")",
+                  "export HELM_EXPERIMENTAL_OCI=1",
+                  "aws ecr get-login-password | helm registry login --username AWS --password-stdin $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com"
+                  ]
+              },
+              "build": {
+                  "commands": [
+                  "export CHARTVERSION=$(cat stable/helm/Chart.yaml | grep version | awk {'print $2'})",
+                  "helm chart save stable/helm/ $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$CHARTVERSION",
+                  "helm chart push $(aws sts get-caller-identity --output text --query \"Account\").dkr.ecr.us-west-2.amazonaws.com/helm-eks-bootstrap:$CHARTVERSION"
+                  ]
+              }
+              },
+              "version": "0.2"
+          }
+        Type: CODEPIPELINE
+      Cache:
+        Type: NO_CACHE
+      Description: Pipeline step InfraSetupStack/eksBootstrapHelmChartsPipeline/Build/SynthStep
+      EncryptionKey: !GetAtt 'eksBootstrapHelmChartsPipelineArtifactsBucketEncryptionKey.Arn'
+  eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Condition:
+              Bool:
+                aws:ViaAWSService: codepipeline.amazonaws.com
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+        Version: '2012-10-17'
+  eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:StopBuild
+            Effect: Allow
+            Resource: !GetAtt 'eksBootstrapHelmChartsPipelineBuildSynthStepCdkBuildProject.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksBootstrapHelmChartsPipelineUpdateCodeBuildActionRole'
+  eksInfraCreatePipelineArtifactsBucketEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      EnableKeyRotation: true
+      KeyPolicy:
+        Statement:
+          - Action: kms:*
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Resource: '*'
+        Version: '2012-10-17'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+  eksInfraCreatePipelineArtifactsBucketEncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: This is a sample configuration and access logging need to be enabled per customer requirement
+    Properties:
+      AliasName: alias/eksinfracreatepipeline-808e1cfc
+      TargetKeyId: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+  eksInfraCreatePipelineArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: This is a sample configuration and access logging need to be enabled per customer requirement
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  eksInfraCreatePipelineArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref 'eksInfraCreatePipelineArtifactsBucket'
+      PolicyDocument:
+        Statement:
+          - Action: s3:*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+            Effect: Deny
+            Principal:
+              AWS: '*'
+            Resource:
+              - !GetAtt 'eksInfraCreatePipelineArtifactsBucket.Arn'
+              - !Sub '${eksInfraCreatePipelineArtifactsBucket.Arn}/*'
+        Version: '2012-10-17'
+  eksInfraCreatePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt 'eksBootstrapHelmChartsPipelineRole.Arn'
+      Stages:
+        - Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !GetAtt 'eksInfraCreateRepo.Name'
+                BranchName: main
+                PollForSourceChanges: false
+              Name: !GetAtt 'eksInfraCreateRepo.Name'
+              OutputArtifacts:
+                - Name: c8a4b8179d688a619ec0c65a73c481541dba2b023c_Source
+              RoleArn: !GetAtt 'eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole.Arn'
+              RunOrder: 1
+          Name: Source
+        - Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref 'eksInfraCreatePipelineBuildSynthStepCdkBuildProject'
+              InputArtifacts:
+                - Name: c8a4b8179d688a619ec0c65a73c481541dba2b023c_Source
+              Name: SynthStep
+              OutputArtifacts:
+                - Name: SynthStep_Output
+              RoleArn: !GetAtt 'eksInfraCreatePipelineUpdateCodeBuildActionRole.Arn'
+              RunOrder: 1
+          Name: Build
+      ArtifactStore:
+        EncryptionKey:
+          Id: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+          Type: KMS
+        Location: !Ref 'eksInfraCreatePipelineArtifactsBucket'
+        Type: S3
+    DependsOn:
+      - eksBootstrapHelmChartsPipelineRoleDefaultPolicy
+  eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+        Version: '2012-10-17'
+  eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksInfraCreatePipelineArtifactsBucket.Arn'
+              - !Sub '${eksInfraCreatePipelineArtifactsBucket.Arn}/*'
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Effect: Allow
+            Resource: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+          - Action:
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:UploadArchive
+            Effect: Allow
+            Resource: !GetAtt 'eksInfraCreateRepo.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksInfraCreatePipelineSourceCodeCommitCodePipelineActionRole'
+  eksInfraCreatePipelineEventsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: '2012-10-17'
+  eksInfraCreatePipelineEventsRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: codepipeline:StartPipelineExecution
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${eksInfraCreatePipeline}'
+        Version: '2012-10-17'
+      PolicyName: eksInfraCreatePipelineEventsRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksInfraCreatePipelineEventsRole'
+  eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+        Version: '2012-10-17'
+  eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W12
+            reason: This is a role for which we will not be aware of the exact name beforehands
+          - id: F4
+            reason: This is a role for which we will not be aware of the exact name beforehands
+          - id: W76
+            reason: This is a role for which we will not be aware of the exact name beforehands
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Effect: Allow
+            Resource:
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${eksInfraCreatePipelineBuildSynthStepCdkBuildProject}:*'
+              - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${eksInfraCreatePipelineBuildSynthStepCdkBuildProject}'
+          - Action:
+              - codebuild:BatchPutCodeCoverages
+              - codebuild:BatchPutTestCases
+              - codebuild:CreateReport
+              - codebuild:CreateReportGroup
+              - codebuild:UpdateReport
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/${eksInfraCreatePipelineBuildSynthStepCdkBuildProject}-*'
+          - Action:
+              - ecr:BatchCheckLayerAvailability
+              - ecr:BatchGetImage
+              - ecr:CompleteLayerUpload
+              - ecr:DescribeImages
+              - ecr:DescribeRepositories
+              - ecr:GetAuthorizationToken
+              - ecr:GetDownloadUrlForLayer
+              - ecr:InitiateLayerUpload
+              - ecr:PutImage
+              - ecr:UploadLayerPart
+            Effect: Allow
+            Resource: !GetAtt 'helmEksBootstrap.Arn'
+          - Action:
+              - codeartifact:GetAuthorizationToken
+              - sts:GetServiceBearerToken
+              - codeartifact:*
+            Effect: Allow
+            Resource: '*'
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - !GetAtt 'eksInfraCreatePipelineArtifactsBucket.Arn'
+              - !Sub '${eksInfraCreatePipelineArtifactsBucket.Arn}/*'
+          - Action:
+              - kms:Decrypt
+              - kms:DescribeKey
+              - kms:Encrypt
+              - kms:GenerateDataKey*
+              - kms:ReEncrypt*
+            Effect: Allow
+            Resource: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+          - Action:
+              - ssm:GetParameters
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/EKS_OUT_SSM'
+          - Action:
+              - eks:DescribeCluster
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:eks:${AWS::Region}:${AWS::AccountId}:cluster/sample-cluster'
+          - Action:
+              - sts:AssumeRole
+            Effect: Allow
+            Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/eksctl-sample-cluster*'
+        Version: '2012-10-17'
+      PolicyName: eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole'
+  eksInfraCreatePipelineBuildSynthStepCdkBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/standard:5.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt 'eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole.Arn'
+      Source:
+        BuildSpec: "{\n    \"phases\": {\n    \"install\": {\n        \"runtime-versions\": {\n        \"python\": \"3.8\"\n        },\n        \"commands\": [\n        \"HELM_DOWNLOAD_URL=https://get.helm.sh/helm-v3.5.4-linux-amd64.tar.gz\"\
+          ,\n        \"wget -q $HELM_DOWNLOAD_URL\",\n        \"tar -zxvf helm-v3.5.4-linux-amd64.tar.gz\",\n        \"mv linux-amd64/helm /usr/local/bin/helm\",\n        \"aws codeartifact login --tool\
+          \ pip --repository bootstrap-scripts-python --domain eks-bootstrap --domain-owner $(aws sts get-caller-identity --output text --query \\\"Account\\\") --region us-west-2\",\n        \"pip install\
+          \ ruamel.yaml==0.17.10 -i https://pypi.python.org/simple\",\n        \"pip install deepmerge==0.3.0 -i https://pypi.python.org/simple\",\n        \"pip install jsonpath-ng==1.5.2 -i https://pypi.python.org/simple\"\
+          ,\n        \"pip install bootstrap-cli\",\n        \"export HELM_EXPERIMENTAL_OCI=1\",\n        \"aws ecr get-login-password | helm registry login --username AWS --password-stdin  $(aws sts get-caller-identity\
+          \ --output text --query \\\"Account\\\").dkr.ecr.us-west-2.amazonaws.com\",\n        \"helm version\",\n        \"curl -LO \\\"https://dl.k8s.io/release/v1.22.0/bin/linux/amd64/kubectl\\\"\",\n\
+          \        \"chmod +x kubectl\",\n        \"mkdir -p ~/.local/bin\",\n        \"mv ./kubectl ~/.local/bin/kubectl\"\n        ]\n    },\n    \"build\": {\n        \"commands\": [\n        \"export\
+          \ BOOTSTRAP_DEFAULT_REPO=$(aws sts get-caller-identity --output text --query \\\"Account\\\").dkr.ecr.us-west-2.amazonaws.com\",\n        \"export BOOTSTRAP_HELM_DEFAULT_IMAGE=helm-eks-bootstrap\"\
+          ,\n        \"aws ecr get-login-password | helm registry login --username AWS --password-stdin $BOOTSTRAP_DEFAULT_REPO\",\n        \"export HELM_IMAGE_TAG=1.0\",\n        \"CDK_OUTPUT=$(aws ssm\
+          \ get-parameters --names \\\"EKS_OUT_SSM\\\" --query \\\"Parameters[*].Value\\\"  --output text)\",\n        \"echo $CDK_OUTPUT > artifact.json\",\n        \"export HELMD_awslbc__clusterName=\\\
+          \"sample-cluster\\\"\",\n        \"export HELMD_global__clusterName=\\\"sample-cluster\\\"\", \n        \"export HELMD_clusterName=\\\"sample-cluster\\\"\", \n        \"aws eks update-kubeconfig\
+          \ --name sample-cluster  --region us-west-2 \",\n        \"kubectl get pods -A\",\n        \"bootstrap-cli --template --print_values --release helm-bootstrap --json \\\"config.json\\\" --artifact\
+          \ \\\"artifact.json\\\" --upgrade --context environment:HELMD_ --helm_arg=\\\"-n kube-system\\\"\"\n        ]\n    }\n    },\n    \"version\": \"0.2\"\n}                                      \
+          \   \n"
+        Type: CODEPIPELINE
+      Cache:
+        Type: NO_CACHE
+      Description: Pipeline step InfraSetupStack/eksInfraCreatePipeline/Build/SynthStep
+      EncryptionKey: !GetAtt 'eksInfraCreatePipelineArtifactsBucketEncryptionKey.Arn'
+  eksInfraCreatePipelineUpdateCodeBuildActionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Condition:
+              Bool:
+                aws:ViaAWSService: codepipeline.amazonaws.com
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+        Version: '2012-10-17'
+  eksInfraCreatePipelineUpdateCodeBuildActionRoleDefaultPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:StopBuild
+            Effect: Allow
+            Resource: !GetAtt 'eksInfraCreatePipelineBuildSynthStepCdkBuildProject.Arn'
+        Version: '2012-10-17'
+      PolicyName: eksInfraCreatePipelineUpdateCodeBuildActionRoleDefaultPolicy
+      Roles:
+        - !Ref 'eksInfraCreatePipelineUpdateCodeBuildActionRole'
 Outputs:
   eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleName:
     Description: Information about the value
-    Value: !GetAtt eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole.Arn
+    Value: !GetAtt 'eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRole.Arn'
     Export:
       Name: eksInfraCreatePipelineBuildSynthStepCdkBuildProjectRoleName
