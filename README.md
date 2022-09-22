@@ -1,6 +1,5 @@
 ### High Level flow!
-
-![bootstrap blog](https://github.com/aws-samples/eks-bootstrap-scripts/blob/main/bootstrap_eks.png)
+![bootstrap blog](./bootstrap_eks.png)
 
 
 ### Push helm charts to ecr repo. Make sure you have aws cli credentials & EKS cluster for deploying charts(not required for printing values & rendering helm templates) 
