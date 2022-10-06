@@ -42,6 +42,24 @@ Resources:
             reason: Need explicit name
     Properties:
       RepositoryName: helm-eks-bootstrap
+      RepositoryPolicyText:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: CodeBuildAccess
+        Effect: Allow
+        Principal:
+         Service: codebuild.amazonaws.com
+        Action:
+        - "ecr:BatchGetImage"
+        - "ecr:BatchCheckLayerAvailability"
+        - "ecr:CompleteLayerUpload"
+        - "ecr:GetDownloadUrlForLayer"
+        - "ecr:InitiateLayerUpload"
+        - "ecr:PutImage"
+        - "ecr:UploadLayerPart"
+        Condition:
+         StringEquals:
+           aws:SourceAccount: !Sub '${AWS::AccountId}''
       ImageScanningConfiguration:
         ScanOnPush: true
   eksInfraCreateRepo:
