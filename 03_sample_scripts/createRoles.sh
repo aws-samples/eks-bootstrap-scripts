@@ -126,7 +126,7 @@ cat <<EOF > AlbControllerRolePolicy.json
 }
 EOF
 
-cat <<EOF > MonitoringRolePolicy.json
+cat <<EOF > ExternalDnsControllerRolePolicy.json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -143,7 +143,7 @@ cat <<EOF > MonitoringRolePolicy.json
 }
 EOF
 
-cat <<EOF > ExternalDnsControllerRolePolicy.json
+cat <<EOF > MonitoringRolePolicy.json
 {
   "Version": "2012-10-17",
   "Statement": [
