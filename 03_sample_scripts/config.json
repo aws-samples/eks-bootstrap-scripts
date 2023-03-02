@@ -22,18 +22,18 @@
         ],
        "encrypted": true,
        "subnetIds": [
-        "subnet-022a74871234fg014",
-        "subnet-022a74871234fg015",
-        "subnet-022a74871234fg016"
+        "subnet-##############",
+        "subnet-##############",
+        "subnet-##############"
       ]
     }
     ],
     "createCustomNetworking": {
         "enabled": true,
         "cniSubnets": {
-            "us-west-2a": "subnet-022a74871234fg017",
-            "us-west-2b": "subnet-022a74871234fg018",
-            "us-west-2c": "subnet-022a74871234fg019"
+            "us-west-2a": "subnet-##############",
+            "us-west-2b": "subnet-##############",
+            "us-west-2c": "subnet-##############"
         }
     },
     "loadbalancercontroller": {
